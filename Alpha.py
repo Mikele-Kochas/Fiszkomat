@@ -74,7 +74,7 @@ def next_word():
 
 def main():
     """Main function to run the Streamlit app."""
-    st.title("Fiszki do nauki niemieckiego")
+    st.title("Fiszkomat")
 
     if 'show_input' not in st.session_state:
         st.session_state.show_input = True
