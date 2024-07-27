@@ -52,7 +52,7 @@ def display_flashcard() -> None:
 
     if st.button("Następne słowo", key="next_word"):
         st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
-        st.experimental_rerun()
+        st.rerun()
 
 def generate_word_list(topic: str) -> str:
     prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami.. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemickimi rzeczownikami umieścić właściwe przedrostki. Nie generuj niczego poza samą listą"
