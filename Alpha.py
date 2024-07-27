@@ -41,6 +41,7 @@ def create_flashcards(word_list: str) -> None:
         st.session_state.flashcard = Flashcard(words)
         st.session_state.current_index = 0
         st.session_state.show_input = False
+        st.session_state.word_list = ""  # Clear word list after creating flashcards
     else:
         st.error("Nie znaleziono poprawnie sformatowanych słów.")
 
@@ -56,7 +57,8 @@ def display_flashcard() -> None:
     with col2:
         if st.button("Następne słowo", key="next_word"):
             st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
-            st.experimental_rerun()
+            # Update button state to reflect the new current word
+            st.session_state.show_answer = False
 
 def generate_word_list(topic: str) -> str:
     prompt = (
@@ -84,6 +86,12 @@ def main() -> None:
         st.session_state.show_input = True
     if 'word_list' not in st.session_state:
         st.session_state.word_list = ""
+    if 'flashcard' not in st.session_state:
+        st.session_state.flashcard = None
+    if 'current_index' not in st.session_state:
+        st.session_state.current_index = 0
+    if 'show_answer' not in st.session_state:
+        st.session_state.show_answer = False
 
     # Interface for generating word list
     if st.session_state.show_input:
@@ -107,13 +115,17 @@ def main() -> None:
                 create_flashcards(st.session_state.word_list)
     else:
         # Interface for working with flashcards
-        if 'flashcard' in st.session_state:
+        if st.session_state.flashcard:
             display_flashcard()
 
         if st.button("Nowa lista słów", key="new_word_list_button"):
             st.session_state.show_input = True
             st.session_state.word_list = ""  # Clear previous word list if starting fresh
+            st.session_state.flashcard = None  # Clear flashcard state
+            st.session_state.current_index = 0  # Reset index
+            st.session_state.show_answer = False  # Reset answer visibility
 
 if __name__ == "__main__":
     main()
+
 
