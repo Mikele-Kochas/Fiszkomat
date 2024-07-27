@@ -55,7 +55,7 @@ def display_flashcard() -> None:
         st.experimental_rerun()
 
 def generate_word_list(topic: str) -> str:
-    prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami.. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemickimi rzeczownikami umieścić właściwe przedrostki"
+    prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemickimi rzeczownikami umieścić właściwe przedrostki. Nie pisz niczego poza samą listą."
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}]
@@ -76,6 +76,10 @@ def main() -> None:
         st.session_state.show_input = True
     if 'word_list' not in st.session_state:
         st.session_state.word_list = ""
+    if 'flashcard' not in st.session_state:
+        st.session_state.flashcard = None
+    if 'current_index' not in st.session_state:
+        st.session_state.current_index = 0
 
     # Interface for generating word list
     if st.session_state.show_input:
@@ -99,11 +103,14 @@ def main() -> None:
                 create_flashcards(st.session_state.word_list)
     else:
         # Interface for working with flashcards
-        if 'flashcard' in st.session_state:
+        if st.session_state.flashcard:
             display_flashcard()
 
         if st.button("Nowa lista słów", key="new_word_list"):
             st.session_state.show_input = True
+            st.session_state.word_list = ""
+            st.session_state.flashcard = None
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
