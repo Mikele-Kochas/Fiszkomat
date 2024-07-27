@@ -3,14 +3,9 @@ import openai
 import re
 from dataclasses import dataclass
 from typing import List
-import os
 
-# Load environment variables
-api_key = os.getenv("OPENAI_API_KEY")
-
-if not api_key:
-    st.error("API key is not set. Please set the OPENAI_API_KEY environment variable.")
-    st.stop()
+# Retrieve API key from Streamlit secrets
+api_key = st.secrets["OPENAI_API_KEY"]
 
 # Initialize OpenAI client
 openai.api_key = api_key
