@@ -1,8 +1,19 @@
 import streamlit as st
-import random
+import openai
 import re
 from dataclasses import dataclass
 from typing import List
+import os
+
+# Load environment variables
+api_key = os.getenv("OPENAI_API_KEY")
+
+if not api_key:
+    st.error("API key is not set. Please set the OPENAI_API_KEY environment variable.")
+    st.stop()
+
+# Initialize OpenAI client
+openai.api_key = api_key
 
 @dataclass
 class Word:
@@ -35,96 +46,30 @@ def create_flashcards(word_list: str) -> None:
         st.session_state.flashcard = Flashcard(words)
         st.session_state.current_index = 0
         st.session_state.show_input = False
-        st.session_state.quiz_results = []
     else:
         st.error("Nie znaleziono poprawnie sformatowanych słów.")
 
 def display_flashcard() -> None:
     flashcard = st.session_state.flashcard
     current_word = flashcard.get_word(st.session_state.current_index)
-
-    st.markdown(f"<h3>{current_word.german}</h3>", unsafe_allow_html=True)
-    if st.button("Pokaż/Ukryj tłumaczenie"):
-        st.markdown(f"<h4>{current_word.polish}</h4>", unsafe_allow_html=True)
-
-    if st.button("Następne słowo"):
-        st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
-        st.experimental_rerun()
-
-def take_quiz() -> None:
-    if 'quiz_state' not in st.session_state:
-        num_questions = st.number_input("Ile pytań chcesz w quizie?", min_value=1, max_value=20, value=5)
-        if st.button("Rozpocznij quiz"):
-            st.session_state.quiz_state = {
-                'current_question': 0,
-                'questions': [],
-                'user_answers': [''] * num_questions,
-                'correct_answers': 0,
-                'num_questions': num_questions,
-                'feedback': ''
-            }
-            flashcard = st.session_state.flashcard
-            total_words = flashcard.total_words()
-            st.session_state.quiz_state['questions'] = [
-                flashcard.get_word(random.randint(0, total_words - 1))
-                for _ in range(num_questions)
-            ]
+    st.markdown(f"<h2>{current_word.german}</h2>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        if st.button("Pokaż odpowiedź", key="show_answer"):
+            st.markdown(f"<h3>{current_word.polish}</h3>", unsafe_allow_html=True)
+    with col2:
+        if st.button("Następne słowo", key="next_word"):
+            st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
             st.experimental_rerun()
-    else:
-        st.subheader("Sprawdź swoją wiedzę")
 
-        quiz_state = st.session_state.quiz_state
-        current_word = quiz_state['questions'][quiz_state['current_question']]
-
-        st.write(f"Pytanie {quiz_state['current_question'] + 1} z {quiz_state['num_questions']}")
-        user_answer = st.text_input(
-            f"Przetłumacz słowo: {current_word.german}",
-            key=f"quiz_input_{quiz_state['current_question']}",
-            value=quiz_state['user_answers'][quiz_state['current_question']]
-        )
-
-        if st.button("Sprawdź"):
-            feedback_placeholder = st.empty()
-
-            if user_answer.strip().lower() == current_word.polish.lower():
-                feedback_placeholder.success("Poprawna odpowiedź!")
-                quiz_state['correct_answers'] += 1
-            else:
-                feedback_placeholder.error(f"Niepoprawna odpowiedź. Poprawne tłumaczenie: {current_word.polish}")
-
-            quiz_state['user_answers'][quiz_state['current_question']] = user_answer
-
-        if st.button("Następne pytanie"):
-            quiz_state['current_question'] += 1
-            quiz_state['feedback'] = ''
-
-            if quiz_state['current_question'] >= quiz_state['num_questions']:
-                score = quiz_state['correct_answers'] / quiz_state['num_questions']
-                st.session_state.quiz_results.append(score)
-                st.write(
-                    f"Koniec quizu! Uzyskałeś {quiz_state['correct_answers']} na {quiz_state['num_questions']} możliwych punktów.")
-                del st.session_state.quiz_state
-            else:
-                st.experimental_rerun()
-
-    if st.button("Powrót do fiszek"):
-        if 'quiz_state' in st.session_state:
-            del st.session_state.quiz_state
-        st.experimental_rerun()
-
-def display_statistics() -> None:
-    st.subheader("Twoje statystyki")
-
-    if 'flashcard' in st.session_state:
-        flashcard = st.session_state.flashcard
-        total_words = flashcard.total_words()
-        st.write(f"Wprowadzono {total_words} słów.")
-
-        if st.session_state.quiz_results:
-            avg_score = sum(st.session_state.quiz_results) / len(st.session_state.quiz_results)
-            st.write(f"Średni wynik quizu: {avg_score:.2%}")
-    else:
-        st.write("Brak danych do wyświetlenia statystyk.")
+def generate_word_list(topic: str) -> str:
+    prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemieckimi rzeczownikami umieścić właściwe przedrostki."
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message['content']
 
 def main() -> None:
     st.set_page_config(
@@ -135,38 +80,39 @@ def main() -> None:
 
     st.title("Fiszkomat")
 
+    # Initialize application state
     if 'show_input' not in st.session_state:
         st.session_state.show_input = True
+    if 'word_list' not in st.session_state:
+        st.session_state.word_list = ""
 
-    if 'quiz_results' not in st.session_state:
-        st.session_state.quiz_results = []
-
+    # Interface for generating word list
     if st.session_state.show_input:
-        word_list = st.text_area(
-            "Wprowadź listę słów (niemieckie - polskie):",
-            height=200,
-            help="Każde słowo w nowej linii, format: niemieckie_słowo - polskie_tłumaczenie"
+        topic = st.text_input(
+            "Podaj temat, z którego chcesz się uczyć słówek:",
+            help="Np. pogoda, jedzenie, podróże"
         )
 
-        if st.button("Utwórz fiszki"):
-            create_flashcards(word_list)
+        if st.button("Generuj listę słów", key="generate_word_list"):
+            with st.spinner("Generowanie listy słów..."):
+                try:
+                    st.session_state.word_list = generate_word_list(topic)
+                    st.success("Lista słów została wygenerowana!")
+                except Exception as e:
+                    st.error(f"Wystąpił błąd podczas generowania listy słów: {str(e)}")
+
+        if st.session_state.word_list:
+            st.subheader("Wygenerowana lista słów:")
+            st.text_area("", st.session_state.word_list, height=200)
+            if st.button("Utwórz fiszki", key="create_flashcards"):
+                create_flashcards(st.session_state.word_list)
     else:
+        # Interface for working with flashcards
         if 'flashcard' in st.session_state:
-            tab1, tab2, tab3 = st.tabs(["Fiszki", "Quiz", "Statystyki"])
+            display_flashcard()
 
-            with tab1:
-                display_flashcard()
-
-            with tab2:
-                take_quiz()
-
-            with tab3:
-                display_statistics()
-
-        if st.button("Nowa lista słów"):
+        if st.button("Nowa lista słów", key="new_word_list"):
             st.session_state.show_input = True
-            if 'quiz_state' in st.session_state:
-                del st.session_state.quiz_state
 
 if __name__ == "__main__":
     main()
