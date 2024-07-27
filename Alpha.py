@@ -46,21 +46,40 @@ def create_flashcards(word_list: str) -> None:
 def display_flashcard() -> None:
     flashcard = st.session_state.flashcard
     current_word = flashcard.get_word(st.session_state.current_index)
-    st.markdown(f"<h2>{current_word.german}</h2>", unsafe_allow_html=True)
-    if st.button("Pokaż odpowiedź", key="show_answer"):
-        st.markdown(f"<h3>{current_word.polish}</h3>", unsafe_allow_html=True)
+    st.markdown(f"### {current_word.german}")
 
-    if st.button("Następne słowo", key="next_word"):
-        st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
-        st.experimental_rerun()
+    if st.button("Pokaż odpowiedź", key="show_answer"):
+        st.markdown(f"#### {current_word.polish}")
+
+    st.write(f"Słowo {st.session_state.current_index + 1} z {flashcard.total_words()}")
+
+    cols = st.columns([1, 2])
+    with cols[0]:
+        if st.button("Poprzednie słowo", key="prev_word") and st.session_state.current_index > 0:
+            st.session_state.current_index -= 1
+    with cols[1]:
+        if st.button("Następne słowo", key="next_word"):
+            st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
+
+    # Trigger a re-render by changing session state
+    st.experimental_rerun()
 
 def generate_word_list(topic: str) -> str:
-    prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemickimi rzeczownikami umieścić właściwe przedrostki. Nie pisz niczego poza samą listą."
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message['content']
+    if not topic.strip():
+        st.error("Proszę wprowadzić temat.")
+        return ""
+    
+    prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemieckimi rzeczownikami umieścić właściwe przedrostki. Nie pisz niczego poza samą listą."
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message['content']
+    except openai.error.OpenAIError as e:
+        st.error(f"Błąd podczas komunikacji z OpenAI: {str(e)}")
+        return ""
 
 def main() -> None:
     st.set_page_config(
@@ -90,11 +109,10 @@ def main() -> None:
 
         if st.button("Generuj listę słów", key="generate_word_list"):
             with st.spinner("Generowanie listy słów..."):
-                try:
-                    st.session_state.word_list = generate_word_list(topic)
+                word_list = generate_word_list(topic)
+                if word_list:
+                    st.session_state.word_list = word_list
                     st.success("Lista słów została wygenerowana!")
-                except Exception as e:
-                    st.error(f"Wystąpił błąd podczas generowania listy słów: {str(e)}")
 
         if st.session_state.word_list:
             st.subheader("Wygenerowana lista słów:")
@@ -110,8 +128,9 @@ def main() -> None:
             st.session_state.show_input = True
             st.session_state.word_list = ""
             st.session_state.flashcard = None
-            st.experimental_rerun()
+            st.session_state.current_index = 0
 
 if __name__ == "__main__":
     main()
+
 
