@@ -3,9 +3,12 @@ import openai
 import re
 from dataclasses import dataclass
 from typing import List
+from gtts import gTTS
+from io import BytesIO
 
 # Replace this with your actual OpenAI API key
 api_key = st.secrets["OPENAI_API_KEY"]
+
 # Initialize OpenAI client
 openai.api_key = api_key
 
@@ -24,6 +27,7 @@ class Flashcard:
     def total_words(self) -> int:
         return len(self.words)
 
+# Function to parse the word list from a text format to Word objects
 def parse_word_list(word_list: str) -> List[Word]:
     words = []
     for line in word_list.strip().split('\n'):
@@ -34,6 +38,7 @@ def parse_word_list(word_list: str) -> List[Word]:
                 words.append(Word(german=german, polish=polish))
     return words
 
+# Function to create flashcards from the word list
 def create_flashcards(word_list: str) -> None:
     words = parse_word_list(word_list)
     if words:
@@ -43,25 +48,41 @@ def create_flashcards(word_list: str) -> None:
     else:
         st.error("Nie znaleziono poprawnie sformatowanych słów.")
 
+# Function to generate an audio file from text using gTTS
+def generate_audio(text: str) -> BytesIO:
+    tts = gTTS(text, lang='de')  # Set language to German
+    audio_file = BytesIO()
+    tts.write_to_fp(audio_file)
+    audio_file.seek(0)
+    return audio_file
+
+# Function to display the current flashcard
 def display_flashcard() -> None:
     flashcard = st.session_state.flashcard
     current_word = flashcard.get_word(st.session_state.current_index)
     st.markdown(f"<h2>{current_word.german}</h2>", unsafe_allow_html=True)
+    
+    # Generate and play audio
+    audio_file = generate_audio(current_word.german)
+    st.audio(audio_file, format='audio/mp3')
+
     if st.button("Pokaż odpowiedź", key="show_answer"):
         st.markdown(f"<h3>{current_word.polish}</h3>", unsafe_allow_html=True)
 
     if st.button("Następne słowo", key="next_word"):
         st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
-        st.rerun()
+        st.experimental_rerun()
 
+# Function to generate a word list on a given topic
 def generate_word_list(topic: str) -> str:
-    prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami.. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemickimi rzeczownikami umieścić właściwe przedrostki. Nie generuj niczego poza samą listą"
+    prompt = f"Wygeneruj listę 10 słów w języku niemieckim związanych z tematem '{topic}' wraz z ich polskimi tłumaczeniami. Format: niemieckie słowo - polskie tłumaczenie. Pamiętaj, aby przed niemieckimi rzeczownikami umieścić właściwe przedrostki. Nie generuj niczego poza samą listą"
     response = openai.ChatCompletion.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message['content']
 
+# Main function of the application
 def main() -> None:
     st.set_page_config(
         page_title="Fiszkomat",
@@ -107,5 +128,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
