@@ -71,7 +71,7 @@ def display_flashcard() -> None:
 
     if st.button("Następne słowo", key="next_word"):
         st.session_state.current_index = (st.session_state.current_index + 1) % flashcard.total_words()
-        st.experimental_rerun()
+        st.rerun()
 
 # Function to generate a word list on a given topic
 def generate_word_list(topic: str) -> str:
